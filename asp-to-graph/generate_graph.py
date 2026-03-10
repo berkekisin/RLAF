@@ -280,6 +280,49 @@ def _extract_graph_from_model(
 
 
 # ---------------------------------------------------------------------------
+# Isolated node filtering
+# ---------------------------------------------------------------------------
+
+def filter_isolated_nodes(
+    ordered_nodes: List[str],
+    edges: Set[Tuple[str, str]],
+    label_map: Dict[str, str],
+) -> Tuple[List[str], Set[Tuple[str, str]], Dict[str, str]]:
+    """
+    Remove isolated nodes (nodes that do not occur in any edge).
+
+    Args:
+        ordered_nodes: list of all node identifiers in ID order.
+        edges:         set of directed edges (u, v).
+        label_map:     node_id -> label mapping.
+
+    Returns:
+        filtered_nodes: list of node identifiers that appear in at least one edge.
+        filtered_edges: unchanged edges (edges already only use non-isolated nodes).
+        filtered_labels: labels restricted to filtered_nodes.
+
+    If there are no edges, the result will have an empty node list.
+    """
+    if not edges:
+        print("Warning: No edges found; all nodes are isolated and will be removed.", file=sys.stderr)
+        return [], set(), {}
+
+    used_nodes: Set[str] = set()
+    for u, v in edges:
+        used_nodes.add(u)
+        used_nodes.add(v)
+
+    filtered_nodes = [n for n in ordered_nodes if n in used_nodes]
+    filtered_labels = {n: label_map[n] for n in filtered_nodes if n in label_map}
+
+    removed = len(ordered_nodes) - len(filtered_nodes)
+    if removed > 0:
+        print(f"Filtered out {removed} isolated node(s).", file=sys.stderr)
+
+    return filtered_nodes, edges, filtered_labels
+
+
+# ---------------------------------------------------------------------------
 # Adjacency matrix construction and CSV output
 # ---------------------------------------------------------------------------
 
@@ -387,6 +430,9 @@ def main() -> None:
     reified_program = "".join([f"{symbol}.\n" for symbol in reified_symbols])
 
     ordered_nodes, edges, label_map = combine_and_solve(reified_program, meta_program_source)
+
+    ordered_nodes, edges, label_map = filter_isolated_nodes(ordered_nodes, edges, label_map)
+
 
     matrix = build_adjacency_matrix(ordered_nodes, edges)
 
